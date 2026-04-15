@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Code Nebula v8 &middot; ai_indexer</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.min.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/controls/OrbitControls.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/postprocessing/EffectComposer.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/postprocessing/RenderPass.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/postprocessing/UnrealBloomPass.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/postprocessing/ShaderPass.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/shaders/LuminosityHighPassShader.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/shaders/CopyShader.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/renderers/CSS2DRenderer.js"></script><script src="https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/dist/tween.umd.js"></script><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<script>const ALL_FILES={};const FULL_EDGES=[];const MODULES_DATA={};const CYCLIC_SET=new Set([]);const HEALTH_SCORE=1.0000;const PROJECT_NAME="ai_indexer";</script>
+<style></style>
+<style>
+.modules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:12px;}
+.module-card{background:#f8fafc;border-radius:9px;padding:13px;border:1px solid #e2e8f0;}
+.module-name{font-weight:600;font-size:.83rem;color:#0f172a;margin-bottom:4px;}
+.module-count{font-size:.72rem;color:#64748b;}
+.module-sample{font-size:.68rem;color:#94a3b8;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;}
+</style>
+<div id="project-title">ai_indexer</div>
+<div id="nebula-view"><canvas id="nebula-canvas"></canvas></div>
+<div id="nebula-controls">
+  <button class="nb-btn" id="btn-to-dash">Dashboard</button>
+  <button class="nb-btn" id="btn-tour">Tour</button>
+  <button class="nb-btn" id="btn-legend">Legend</button>
+</div>
+<div id="info-panel">
+  <button id="info-close">&times;</button>
+  <div id="info-content"></div>
+</div>
+<div id="nebula-legend"><div class="leg-item"><div class="leg-dot" style="background:#ffd700"></div><span>auth</span></div>
+<div class="leg-item"><div class="leg-dot" style="background:#1a80ff"></div><span>database</span></div>
+<div class="leg-item"><div class="leg-dot" style="background:#ff19cc"></div><span>ui</span></div>
+<div class="leg-item"><div class="leg-dot" style="background:#19e699"></div><span>api</span></div>
+<div class="leg-item"><div class="leg-dot" style="background:#f2c141"></div><span>billing</span></div>
+<div class="leg-item"><div class="leg-dot" style="background:#80e619"></div><span>utils</span></div>
+<div class="leg-item"><div class="leg-dot" style="background:#e6990a"></div><span>config</span></div>
+<div class="leg-item"><div class="leg-dot" style="background:#66b3ff"></div><span>cache</span></div>
+<div class="leg-item"><div class="leg-dot" style="background:#ff5050"></div><span>security</span></div>
+<div class="leg-item"><div class="leg-dot" style="background:#e0e0e0"></div><span>shared</span></div></div>
+<div id="dash-view">
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>AI Context Index &middot; ai_indexer</h1>
+        <div class="subtitle">Generated 2026-04-14 19:37:03 &middot; v0.0.2</div>
+      </div>
+    </div>
+    <div class="stats-grid"><div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Total Files</div></div><div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Critical</div></div><div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Domains</div></div><div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Entrypoints</div></div></div>
+    <div class="table-card"><h2 style="font-size:.95rem;font-weight:600;color:#0f172a;margin-bottom:12px;">Top 20 Hotspots</h2><table><thead><tr><th>File</th><th>Criticality</th><th>Priority</th><th>Domain</th><th>Refactor Effort</th><th>Blast Radius</th></tr></thead><tbody></tbody></table></div>
+    <div class="chart-card"><h2>Modules</h2><div class="modules-grid"></div></div>
+    <div class="chart-card"><h2>Architectural Warnings (0 files)</h2><div class="warn-list"><p style="color:#64748b;font-size:.83rem;">No warnings detected.</p></div></div>
+    <div id="back-bar">
+      <button class="nb-btn" id="btn-to-nebula" style="background:#1a3460;border-color:#2d5a9e;">
+        Back to Nebula
+      </button>
+    </div>
+  </div>
+</div>
+<script></script>
+<script>
+function switchView(v){
+  var nv=document.getElementById('nebula-view');
+  var dv=document.getElementById('dash-view');
+  var nc=document.getElementById('nebula-controls');
+  var lg=document.getElementById('nebula-legend');
+  var ip=document.getElementById('info-panel');
+  var pt=document.getElementById('project-title');
+  if(v==='nebula'){
+    nv.style.display='block';dv.style.display='none';
+    nc.style.display='flex';pt.style.display='block';
+    document.body.style.overflow='hidden';
+  } else {
+    nv.style.display='none';dv.style.display='block';
+    nc.style.display='none';lg.style.display='none';
+    ip.style.display='none';pt.style.display='none';
+    document.body.style.overflow='auto';document.body.style.background='#f0f4f8';
+  }
+}
+document.getElementById('btn-to-dash').addEventListener('click',function(){switchView('dash');});
+var nb=document.getElementById('btn-to-nebula');
+if(nb) nb.addEventListener('click',function(){switchView('nebula');});
+</script>
+</body>
+</html>

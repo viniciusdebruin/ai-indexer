@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Code Nebula v8 &middot; {{ project }}</title>
+<!-- Three.js core + addons -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.163.0/examples/js/renderers/CSS2DRenderer.js"></script>
+<!-- TWEEN + Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/dist/tween.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+{# ── Injected data constants ───────────────────────────────────────────── #}
+<script>{{ data_block }}</script>
+
+{# ── Styles ────────────────────────────────────────────────────────────── #}
+<style>{{ styles_css }}</style>
+<style>
+.modules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:12px;}
+.module-card{background:#f8fafc;border-radius:9px;padding:13px;border:1px solid #e2e8f0;}
+.module-name{font-weight:600;font-size:.83rem;color:#0f172a;margin-bottom:4px;}
+.module-count{font-size:.72rem;color:#64748b;}
+.module-sample{font-size:.68rem;color:#94a3b8;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;}
+</style>
+
+<div id="project-title">{{ project | e }}</div>
+
+{# ── Nebula canvas ────────────────────────────────────────────────────── #}
+<div id="nebula-view">
+  <canvas id="nebula-canvas"></canvas>
+</div>
+
+{# ── Controls ─────────────────────────────────────────────────────────── #}
+<div id="nebula-controls">
+  <button class="nb-btn" id="btn-to-dash">Dashboard</button>
+  <button class="nb-btn" id="btn-tour">Tour</button>
+  <button class="nb-btn" id="btn-legend">Legend</button>
+</div>
+
+{# ── Info panel ───────────────────────────────────────────────────────── #}
+<div id="info-panel">
+  <button id="info-close">&times;</button>
+  <div id="info-content"></div>
+</div>
+
+{# ── Legend ───────────────────────────────────────────────────────────── #}
+<div id="nebula-legend">
+  {% for domain, color in [
+    ("auth","#ffd700"),("database","#1a80ff"),("ui","#ff19cc"),("api","#19e699"),
+    ("billing","#f2c141"),("utils","#80e619"),("config","#e6990a"),
+    ("cache","#66b3ff"),("security","#ff5050"),("shared","#e0e0e0")
+  ] %}
+  <div class="leg-item">
+    <div class="leg-dot" style="background:{{ color }}"></div>
+    <span>{{ domain }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+{# ── Dashboard view ───────────────────────────────────────────────────── #}
+<div id="dash-view">
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>AI Context Index &middot; {{ project | e }}</h1>
+        <div class="subtitle">Generated {{ ts | e }} &middot; v{{ version | e }}</div>
+      </div>
+    </div>
+
+    {# Stats #}
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.total_files }}</div>
+        <div class="stat-label">Total Files</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.critical }}</div>
+        <div class="stat-label">Critical</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.domains }}</div>
+        <div class="stat-label">Domains</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.entrypoints }}</div>
+        <div class="stat-label">Entrypoints</div>
+      </div>
+    </div>
+
+    {# Hotspot table #}
+    <div class="table-card">
+      <h2 style="font-size:.95rem;font-weight:600;color:#0f172a;margin-bottom:12px;">Top 20 Hotspots</h2>
+      <table>
+        <thead><tr>
+          <th>File</th><th>Criticality</th><th>Priority</th>
+          <th>Domain</th><th>Refactor Effort</th><th>Blast Radius</th>
+        </tr></thead>
+        <tbody>
+          {% for h in top20 %}
+          {% set crit = h.criticality %}
+          {% set bc = "badge-critical" if crit=="critical" else "badge-infra" if crit=="infra" else "badge-config" if crit=="config" else "badge-default" %}
+          <tr>
+            <td>{{ h.file | e }}</td>
+            <td><span class="badge {{ bc }}">{{ crit | e }}</span></td>
+            <td>{{ h.priority }}</td>
+            <td>{{ h.domain | e }}</td>
+            <td>{{ "%.1f"|format(h.refactor_effort) }}</td>
+            <td>{{ h.blast_radius }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Modules #}
+    <div class="chart-card">
+      <h2>Modules</h2>
+      <div class="modules-grid">
+        {% for m in mod_summary %}
+        <div class="module-card">
+          <div class="module-name">{{ m.name | e }}</div>
+          <div class="module-count">{{ m.count }} file{{ "s" if m.count != 1 else "" }}</div>
+          <div class="module-sample">{{ m.sample | e }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# Warnings #}
+    <div class="chart-card">
+      <h2>Architectural Warnings ({{ warning_files | length }} files)</h2>
+      <div class="warn-list">
+        {% if warning_files %}
+          {% for fp, wl in warning_files[:20] %}
+          <div class="warn-item">
+            <div class="warn-file">{{ fp | e }}</div>
+            {% for w in wl[:3] %}
+            <div class="warn-msg">&bull; {{ w | e }}</div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        {% else %}
+          <p style="color:#64748b;font-size:.83rem;">No warnings detected.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div id="back-bar">
+      <button class="nb-btn" id="btn-to-nebula" style="background:#1a3460;border-color:#2d5a9e;">
+        Back to Nebula
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ── Three.js visualisation ────────────────────────────────────────────── #}
+<script>{{ nebula_js }}</script>
+
+{# ── View switcher ────────────────────────────────────────────────────── #}
+<script>
+(function(){
+  function switchView(v){
+    var nv=document.getElementById('nebula-view');
+    var dv=document.getElementById('dash-view');
+    var nc=document.getElementById('nebula-controls');
+    var lg=document.getElementById('nebula-legend');
+    var ip=document.getElementById('info-panel');
+    var pt=document.getElementById('project-title');
+    if(v==='nebula'){
+      nv.style.display='block';dv.style.display='none';
+      nc.style.display='flex';pt.style.display='block';
+      document.body.style.overflow='hidden';
+    } else {
+      nv.style.display='none';dv.style.display='block';
+      nc.style.display='none';
+      if(lg) lg.style.display='none';
+      if(ip) ip.style.display='none';
+      pt.style.display='none';
+      document.body.style.overflow='auto';
+      document.body.style.background='#f0f4f8';
+    }
+  }
+  var bd=document.getElementById('btn-to-dash');
+  var bn=document.getElementById('btn-to-nebula');
+  if(bd) bd.addEventListener('click',function(){switchView('dash');});
+  if(bn) bn.addEventListener('click',function(){switchView('nebula');});
+})();
+</script>
+</body>
+</html>

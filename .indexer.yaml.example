@@ -1,0 +1,52 @@
+# .indexer.yaml — Project-specific configuration for AI Context Indexer
+# Copy to .indexer.yaml and adjust for your project.
+
+# Directories to exclude (merged with built-in defaults)
+exclude_dirs:
+  - deploy
+  - coverage
+  - fixtures
+  - stubs
+
+text_files:
+  extra_names:
+    - "Taskfile"
+    - "Dockerfile.dev"
+    - "Vagrantfile"
+
+# File patterns to exclude (fnmatch-style)
+exclude_patterns:
+  - "*.generated.ts"
+  - "*_pb2.py"
+  - "*.snap"
+
+# Override criticality for specific path prefixes
+criticality_overrides:
+  "src/contracts/": critical
+  "src/billing/":   critical
+  "src/shared/":    config
+  "scripts/":       supporting
+
+# Domain overrides: map path prefix → domain label
+domain_overrides:
+  "src/auth/":      auth
+  "src/payments/":  billing
+  "src/api/":       api
+
+# Max file depth to traverse
+max_depth: 8
+
+# Parallel worker count (0 = auto)
+max_workers: 0
+
+# Output formats to generate: toon, json, md, html
+output_formats:
+  - toon
+  - html
+  - md
+
+# Output directory (relative to project root; default = project root)
+output_dir: "."
+
+# Token budget for chunk splitting
+chunk_max_tokens: 800

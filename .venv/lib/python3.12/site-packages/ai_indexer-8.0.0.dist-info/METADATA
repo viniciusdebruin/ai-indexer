@@ -1,0 +1,22 @@
+Metadata-Version: 2.4
+Name: ai-indexer
+Version: 8.0.0
+Summary: AI Context Indexer – Production-Ready for 2026 LLM Ecosystems
+License: MIT
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.0
+Requires-Dist: pathspec>=0.11
+Provides-Extra: full
+Requires-Dist: tree-sitter>=0.22; extra == "full"
+Requires-Dist: tree-sitter-python; extra == "full"
+Requires-Dist: tree-sitter-typescript; extra == "full"
+Requires-Dist: tree-sitter-javascript; extra == "full"
+Requires-Dist: tiktoken; extra == "full"
+Requires-Dist: pyyaml>=6.0; extra == "full"
+Requires-Dist: jinja2>=3.1; extra == "full"
+Requires-Dist: tomli; python_version < "3.11" and extra == "full"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: mypy>=1.9; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
