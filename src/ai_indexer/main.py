@@ -1,4 +1,4 @@
-"""CLI entrypoint for AI Context Indexer v8.0.0."""
+"""CLI entrypoint for AI Context Indexer."""
 
 from __future__ import annotations
 
@@ -19,8 +19,9 @@ from ai_indexer.exporters.toon import ToonExporter
 from ai_indexer.exporters.xml_exporter import XmlExporter
 from ai_indexer.mcp.server import MCPServer
 from ai_indexer.utils.config import load_config
+from ai_indexer.utils.ui import AnalysisUI
 
-# ── Structured JSON logging ───────────────────────────────────────────────────
+# ── Structured JSON logging (active only in verbose/non-TTY mode) ─────────────
 logging.basicConfig(
     level=logging.INFO,
     format='{"time":"%(asctime)s","level":"%(levelname)s","msg":"%(message)s"}',
@@ -353,31 +354,46 @@ def _detect_modules(engine: AnalysisEngine) -> dict[str, list[str]]:
     return dict(sorted(modules.items()))
 
 
-def _write_outputs(engine: AnalysisEngine, output_data: dict[str, Any],
-                   fmt: str, override_path: Path | None, out_dir: Path) -> None:
+def _write_outputs(
+    engine: AnalysisEngine,
+    output_data: dict[str, Any],
+    fmt: str,
+    override_path: Path | None,
+    out_dir: Path,
+) -> list[tuple[str, Path]]:
+    """Write all requested output formats. Returns list of (format, path) tuples."""
+    written: list[tuple[str, Path]] = []
+
     if fmt in ("toon", "all"):
         path = override_path or (out_dir / "estrutura_projeto.toon")
         ToonExporter().export(output_data, path)
         log.info("TOON written: %s", path)
+        written.append(("toon", path))
 
     if fmt in ("json", "all"):
         path = override_path or (out_dir / "estrutura_projeto.json")
         path.write_text(json.dumps(output_data, separators=(",",":"), ensure_ascii=False), encoding="utf-8")
         log.info("JSON written: %s", path)
+        written.append(("json", path))
 
     if fmt in ("html", "all"):
         path = override_path or (out_dir / "estrutura_projeto.html")
         HtmlExporter().export(output_data, path)
         log.info("HTML written: %s", path)
+        written.append(("html", path))
 
     if fmt in ("md", "all"):
         path = override_path or (out_dir / "estrutura_projeto.md")
         _write_md(engine, output_data, path)
         log.info("Markdown written: %s", path)
+        written.append(("md", path))
 
     if fmt in ("xml", "all"):
         path = override_path or (out_dir / "estrutura_projeto.xml")
         XmlExporter().export(output_data, path)
+        written.append(("xml", path))
+
+    return written
 
 
 def _write_md(engine: AnalysisEngine, data: dict[str, Any], path: Path) -> None:
@@ -422,25 +438,35 @@ def main() -> None:
     parser = _build_parser()
     args   = parser.parse_args()
 
+    # ── Terminal UI ───────────────────────────────────────────────────────────
+    ui = AnalysisUI(verbose=args.verbose)
+
+    # JSON structured logging is for machine consumption (--verbose / CI pipes).
+    # In normal interactive use the UI handles all output, so suppress it.
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
         log.setLevel(logging.DEBUG)
+    else:
+        logging.getLogger().setLevel(logging.WARNING)
 
     root = Path(args.project_dir).resolve() if args.project_dir else Path.cwd()
     if not root.is_dir():
-        log.error("Not a directory: %s", root)
+        ui.error(f"Not a directory: {root}")
         sys.exit(1)
 
     config = load_config(root)
     out_dir = (root / config.output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    ui.header(__version__, root)
+
     engine = AnalysisEngine(root, config)
     if args.no_cache:
         engine.cache.clear()
 
     t0 = time.time()
-    engine.run()
+    engine.run(on_progress=ui.on_progress)
+    ui.stop_progress()
     log.info("Analysis complete in %.2fs", time.time() - t0)
 
     # ── Instruction file ──────────────────────────────────────────────────────
@@ -474,7 +500,15 @@ def main() -> None:
 
     output_data = _build_output(engine, instruction=instruction, git_context=git_ctx)
     override    = Path(args.output) if args.output else None
-    _write_outputs(engine, output_data, args.format, override, out_dir)
+    written     = _write_outputs(engine, output_data, args.format, override, out_dir)
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    n_security = sum(
+        1 for fd in engine.files.values()
+        for w in fd.warnings
+        if "secret" in w.lower() or "credential" in w.lower() or "hardcoded" in w.lower()
+    )
+    ui.show_summary(output_data["stats"], n_security, written)
 
     # 🎙️ Audio Tour Integration (100% Offline)
     if args.audio:

@@ -11,6 +11,7 @@ import time
 from collections import Counter, defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any, TypedDict
 
 from ai_indexer.core.cache import AnalysisCache
@@ -512,15 +513,23 @@ class AnalysisEngine:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def run(self) -> None:
+    def run(
+        self,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> None:
         t0 = time.time()
         log.info("AI Context Indexer v%s — %s", VERSION, self.root)
         try:
             paths = self._collect_files()
             log.info("Found %d files — analysing", len(paths))
+            # Signal file count to the UI (done=0 means "scan complete, N files")
+            if on_progress:
+                on_progress(0, len(paths))
             self._file_index = self._build_file_index(paths)
             aliases, bare = build_import_resolution_state(self.root, self._file_index)
-            results = self._analyse_parallel(paths, aliases, bare, self.config.max_workers)
+            results = self._analyse_parallel(
+                paths, aliases, bare, self.config.max_workers, on_progress
+            )
             self._update_files_and_cache(results)
             self._post_process()
         except KeyboardInterrupt:
@@ -648,10 +657,12 @@ class AnalysisEngine:
         aliases: dict[str, Path],
         bare: set[str],
         max_workers: int,
+        on_progress: Callable[[int, int], None] | None = None,
     ) -> list[tuple[str, dict[str, Any]]]:
         results: list[tuple[str, dict[str, Any]]] = []
-        root_str = str(self.root)
         file_index = self._file_index
+        total = len(paths)
+        done = 0
 
         def _work(p: Path) -> tuple[str, dict[str, Any]]:
             rel = p.relative_to(self.root).as_posix()
@@ -677,9 +688,16 @@ class AnalysisEngine:
                         results.append(fut.result())
                     except Exception as exc:
                         log.error("Worker error for %s: %s", futures[fut], exc)
+                    done += 1
+                    if on_progress:
+                        on_progress(done, total)
         except Exception as e:
             log.error("ThreadPool failed: %s, using serial processing", e)
-            results = [_work(p) for p in paths]
+            for p in paths:
+                results.append(_work(p))
+                done += 1
+                if on_progress:
+                    on_progress(done, total)
 
         return results
 
