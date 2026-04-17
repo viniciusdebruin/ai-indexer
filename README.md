@@ -9,9 +9,9 @@
 **[English version ‚Üí README.en.md](README.en.md)**
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## O que √©
 
@@ -31,9 +31,9 @@ O que o indexer produz para cada arquivo:
 - **Contexto git** ‚Äî hist√≥rico de commits, diff stat, frequ√™ncia de mudan√ßas por arquivo
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Instala√ß√£o
 
@@ -71,9 +71,9 @@ pip install -e ".[full,dev]"
 | Mixagem de m√∫sica de fundo | `pydub` + `ffmpeg` instalado no sistema |
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## In√≠cio R√°pido
 
@@ -92,9 +92,9 @@ ai-indexer --format toon --output context.toon ~/projects/meu-app
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Uso
 
@@ -155,9 +155,9 @@ Se `PROJECT_DIR` n√£o for informado, usa o diret√≥rio atual. Se o projeto tiver 
 | `--help, -h` | Exibe o help completo e sai |
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Formatos de Sa√≠da
 
@@ -230,9 +230,9 @@ ai-indexer --format xml .
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Arquivos Gerados
 
@@ -248,9 +248,9 @@ Todos escritos no diret√≥rio do projeto (ou no `output_dir` configurado):
 | `.aicontext_cache_v8.json` | Cache incremental por arquivo (n√£o commitar) |
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Configura√ß√£o
 
@@ -323,9 +323,9 @@ git:
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## M√©tricas Explicadas
 
@@ -372,9 +372,9 @@ Alta fan-in = arquivo muito dependido = mudan√ßas s√£o arriscadas.
 Alta fan-out = arquivo muito acoplado = dif√≠cil de testar isoladamente.
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Detec√ß√£o de Segredos
 
@@ -404,9 +404,9 @@ security:
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Inje√ß√£o de Instru√ß√£o
 
@@ -430,9 +430,9 @@ Foque em melhorias de performance no m√≥dulo de cat√°logo (src/catalog/).
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Contexto Git
 
@@ -455,9 +455,9 @@ Isso adiciona ao output:
 √ötil para dar ao LLM contexto de "o que mudou recentemente" e "quais arquivos s√£o mais vol√°teis".
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Servidor MCP
 
@@ -492,9 +492,9 @@ Cada resposta √© uma linha JSON em stdout:
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Tour de √Åudio
 
@@ -518,9 +518,9 @@ Output: `tour_<nome-do-projeto>.mp3` no diret√≥rio de sa√≠da.
 > Para m√∫sica de fundo em MP3, `ffmpeg` deve estar instalado no sistema (`brew install ffmpeg` no macOS).
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Cache Incremental
 
@@ -537,9 +537,9 @@ Adicione ao `.gitignore`:
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Arquitetura
 
@@ -593,9 +593,9 @@ main.py
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Suporte a Linguagens
 
@@ -607,9 +607,9 @@ DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.
 | Outros | `.go`, `.rs`, `.java`, `.rb`, `.php`, `.cs`, `.cpp`, `.c`, `.h`, `.swift`, `.kt`, `.json`, `.yaml`, `.toml`, `.md`, e mais | An√°lise b√°sica de texto |
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Requisitos
 
@@ -618,9 +618,9 @@ DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.
 - Depend√™ncias opcionais: veja tabela na se√ß√£o [Instala√ß√£o](#instala√ß√£o)
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Versionamento
 
@@ -635,9 +635,9 @@ ai-indexer --version
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Contribuindo
 
@@ -658,9 +658,9 @@ mypy src/
 ```
 
 ---
-> Estado atual: o fluxo principal de an·lise est· est·vel; MCP e tour de ·udio continuam como integraÁıes de produto que podem evoluir mais r·pido que o n˙cleo.
+> Estado atual: o fluxo principal de an√°lise est√° est√°vel; MCP e tour de √°udio continuam como integra√ß√µes de produto que podem evoluir mais r√°pido que o n√∫cleo.
 
-DocumentaÁ„o tÈcnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+Documenta√ß√£o t√©cnica complementar: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
 ## Licen√ßa
 
