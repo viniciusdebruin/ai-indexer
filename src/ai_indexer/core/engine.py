@@ -15,26 +15,34 @@ from collections.abc import Callable
 from typing import Any, TypedDict
 
 from ai_indexer.core.cache import AnalysisCache
+from ai_indexer.core.classification import (
+    complexity as classify_complexity,
+    detect_domain as classify_domain,
+    detect_layer as classify_layer,
+    detect_type as classify_type,
+    extract_hints as classify_hints,
+    get_criticality as classify_criticality,
+    is_entrypoint as classify_entrypoint,
+)
 from ai_indexer.core.models import (
+    AnalysisRecord,
     ConfidenceValue,
     FileMetadata,
-    compute_blast_radius_2hop,
-    compute_refactor_effort,
 )
-from ai_indexer.parsers.base import ParseResult, ParserRegistry
+from ai_indexer.core.graph import build_graph, compute_v8_metrics, enrich_graph_metrics
+from ai_indexer.core.pipeline import AnalysisPipeline
+from ai_indexer.parsers.base import ParserRegistry
 from ai_indexer.parsers.python import PythonParser
 from ai_indexer.parsers.typescript import TypeScriptParser
 from ai_indexer.utils.config import IndexerConfig
 from ai_indexer.utils.io import (
     GitignoreFilter,
     ImportResolver,
-    build_import_resolution_state,
     safe_read_text,
 )
+from ai_indexer.version import __version__
 
 log = logging.getLogger("ai-indexer.engine")
-
-VERSION = "0.0.2"
 
 # Aumenta recursionlimit para grafos grandes
 sys.setrecursionlimit(10000)
@@ -502,7 +510,12 @@ class AnalysisEngine:
         self.cache = AnalysisCache(root)
         self.files: dict[str, FileMetadata] = {}
         self.graph: dict[str, list[str]] = {}
-        self.rev: defaultdict[str, list[str]] = defaultdict(list)
+        self.rev: dict[str, list[str]] = {}
+        self.ignore_dirs = _IGNORE_DIRS | self.config.exclude_dirs
+        self.ignore_patterns = _IGNORE_PATTERNS + self.config.exclude_patterns
+        self.generated_files = _GENERATED_FILES
+        self.text_suffixes = _TEXT_SUFFIXES
+        self.special_text_filenames = _SPECIAL_TEXT_FILENAMES | self.config.extra_text_filenames
         self._file_index: dict[str, str] = {}
         self._registry = ParserRegistry()
         self._register_default_parsers()
@@ -518,20 +531,9 @@ class AnalysisEngine:
         on_progress: Callable[[int, int], None] | None = None,
     ) -> None:
         t0 = time.time()
-        log.info("AI Context Indexer v%s — %s", VERSION, self.root)
+        log.info("AI Context Indexer v%s — %s", __version__, self.root)
         try:
-            paths = self._collect_files()
-            log.info("Found %d files — analysing", len(paths))
-            # Signal file count to the UI (done=0 means "scan complete, N files")
-            if on_progress:
-                on_progress(0, len(paths))
-            self._file_index = self._build_file_index(paths)
-            aliases, bare = build_import_resolution_state(self.root, self._file_index)
-            results = self._analyse_parallel(
-                paths, aliases, bare, self.config.max_workers, on_progress
-            )
-            self._update_files_and_cache(results)
-            self._post_process()
+            AnalysisPipeline(self).run(on_progress=on_progress)
         except KeyboardInterrupt:
             log.warning("Interrupted – saving partial cache")
             self.cache.save()
@@ -539,10 +541,11 @@ class AnalysisEngine:
         elapsed = time.time() - t0
         log.info("Analysed %d files in %.2fs", len(self.files), elapsed)
 
-    def _update_files_and_cache(self, results: list[tuple[str, dict[str, Any]]]) -> None:
-        for rel, meta in results:
-            self.cache.set(self.root / rel, meta)
-            self.files[rel] = self._meta_to_model(meta)
+    def _update_files_and_cache(self, results: list[tuple[str, AnalysisRecord | dict[str, Any]]]) -> None:
+        for rel, record in results:
+            analysis_record = record if isinstance(record, AnalysisRecord) else AnalysisRecord.from_dict(record)
+            self.cache.set(self.root / rel, analysis_record.to_dict())
+            self.files[rel] = self._meta_to_model(analysis_record)
         self.cache.save()
 
     def _post_process(self) -> None:
@@ -658,13 +661,13 @@ class AnalysisEngine:
         bare: set[str],
         max_workers: int,
         on_progress: Callable[[int, int], None] | None = None,
-    ) -> list[tuple[str, dict[str, Any]]]:
-        results: list[tuple[str, dict[str, Any]]] = []
+    ) -> list[tuple[str, AnalysisRecord | dict[str, Any]]]:
+        results: list[tuple[str, AnalysisRecord | dict[str, Any]]] = []
         file_index = self._file_index
         total = len(paths)
         done = 0
 
-        def _work(p: Path) -> tuple[str, dict[str, Any]]:
+        def _work(p: Path) -> tuple[str, AnalysisRecord | dict[str, Any]]:
             rel = p.relative_to(self.root).as_posix()
             cached = self.cache.get(p)
             if cached:
@@ -701,14 +704,18 @@ class AnalysisEngine:
 
         return results
 
-    def _run_subinterpreters(self, paths: list[Path], work_func) -> list[tuple[str, dict[str, Any]]]:
-        # Placeholder for actual sub-interpreter implementation
-        # In a real scenario, this would use the interpreters module
-        raise NotImplementedError("Sub-interpreters not fully implemented in this version")
+    def _run_subinterpreters(
+        self,
+        paths: list[Path],
+        work_func: Callable[[Path], tuple[str, AnalysisRecord | dict[str, Any]]],
+    ) -> list[tuple[str, AnalysisRecord | dict[str, Any]]]:
+        # Sub-interpreters are not wired up yet. Keep behavior predictable by
+        # executing the same work function serially instead of failing at runtime.
+        return [work_func(p) for p in paths]
 
     # ── Single-file analysis ──────────────────────────────────────────────────
 
-    def _analyse_file(self, path: Path, resolver: ImportResolver) -> dict[str, Any]:
+    def _analyse_file(self, path: Path, resolver: ImportResolver) -> AnalysisRecord:
         try:
             src = safe_read_text(path)
         except Exception as e:
@@ -718,13 +725,13 @@ class AnalysisEngine:
         rel = path.relative_to(self.root)
         pr = self._registry.parse(path, src, resolver)
 
-        ftype_cv = self._detect_type(rel, src)
-        domain_cv, secondary = self._detect_domain(rel, src)
-        layer = self._detect_layer(ftype_cv.value, rel, src)
-        entry = self._is_entrypoint(rel, src)
-        crit = self._get_criticality(rel, ftype_cv.value)
-        cx_score, cx_label = self._complexity(pr.lines, pr.functions, pr.classes, pr.internal, src)
-        hints_obj = self._extract_hints(
+        ftype_cv = classify_type(rel, src, self.config)
+        domain_cv, secondary = classify_domain(rel, src, self.config)
+        layer = classify_layer(ftype_cv.value, rel, src)
+        entry = classify_entrypoint(rel, src)
+        crit = classify_criticality(rel, ftype_cv.value, self.config)
+        cx_score, cx_label = classify_complexity(pr.lines, pr.functions, pr.classes, pr.internal, src)
+        hints_obj = classify_hints(
             rel, src, ftype_cv.value, domain_cv.value,
             pr.functions, pr.classes, pr.external, pr.module_doc
         )
@@ -737,82 +744,66 @@ class AnalysisEngine:
             except Exception as e:
                 log.debug("Secret scan failed for %s: %s", path, e)
 
-        return {
-            "file": rel.as_posix(),
-            "file_type": ftype_cv.to_dict(),
-            "domain": domain_cv.to_dict(),
-            "secondary_domain": secondary,
-            "layer": layer,
-            "criticality": crit,
-            "entrypoint": entry,
-            "complexity_label": cx_label,
-            "complexity_score": cx_score,
-            "capabilities": {"functions": pr.functions, "classes": pr.classes, "exports": pr.exports},
-            "dependencies": pr.external,
-            "internal_dependencies": pr.internal,
-            "warnings": warnings,
-            "is_in_cycle": False,
-            "docstrings": pr.docstrings,
-            "type_hints": pr.type_hints,
-            "chunks": pr.chunks,
-            "module_doc": pr.module_doc,
-            "hints": hints_obj,
-            "refactor_effort": 0.0,
-            "blast_radius": 0,
-        }
+        return AnalysisRecord(
+            file=rel.as_posix(),
+            file_type=ftype_cv,
+            domain=domain_cv,
+            secondary_domain=secondary,
+            layer=layer,
+            criticality=crit,
+            entrypoint=entry,
+            complexity_label=cx_label,
+            complexity_score=cx_score,
+            capabilities={"functions": pr.functions, "classes": pr.classes, "exports": pr.exports},
+            dependencies=pr.external,
+            internal_dependencies=pr.internal,
+            warnings=warnings,
+            is_in_cycle=False,
+            docstrings=pr.docstrings,
+            type_hints=pr.type_hints,
+            chunks=pr.chunks,
+            module_doc=pr.module_doc,
+            hints=hints_obj,
+            refactor_effort=0.0,
+            blast_radius=0,
+        )
 
     # ── Model construction ────────────────────────────────────────────────────
 
-    def _meta_to_model(self, m: FileMetaDict) -> FileMetadata:
+    def _meta_to_model(self, m: AnalysisRecord | dict[str, Any]) -> FileMetadata:
+        record = m if isinstance(m, AnalysisRecord) else AnalysisRecord.from_dict(m)
         return FileMetadata(
-            file=m["file"],
-            file_type=ConfidenceValue(**m["file_type"]),
-            domain=ConfidenceValue(**m["domain"]),
-            secondary_domain=m.get("secondary_domain"),
-            layer=m.get("layer", "unknown"),
-            criticality=m.get("criticality", "supporting"),
-            entrypoint=m.get("entrypoint", False),
-            complexity_label=m.get("complexity_label", "low"),
-            complexity_score=m.get("complexity_score", 0),
+            file=record.file,
+            file_type=record.file_type,
+            domain=record.domain,
+            secondary_domain=record.secondary_domain,
+            layer=record.layer,
+            criticality=record.criticality,
+            entrypoint=record.entrypoint,
+            complexity_label=record.complexity_label,
+            complexity_score=record.complexity_score,
             priority_score=0,
             priority_breakdown={},
             context="",
             role_hint="",
-            capabilities=m.get("capabilities", {}),
-            dependencies=m.get("dependencies", []),
-            internal_dependencies=m.get("internal_dependencies", []),
-            warnings=m.get("warnings", []),
-            is_in_cycle=m.get("is_in_cycle", False),
-            docstrings=m.get("docstrings", {}),
-            type_hints=m.get("type_hints", {}),
-            chunks=m.get("chunks", []),
-            module_doc=m.get("module_doc"),
-            hints=m.get("hints", {}),
+            capabilities=record.capabilities,
+            dependencies=record.dependencies,
+            internal_dependencies=record.internal_dependencies,
+            warnings=record.warnings,
+            is_in_cycle=record.is_in_cycle,
+            docstrings=record.docstrings,
+            type_hints=record.type_hints,
+            chunks=record.chunks,
+            module_doc=record.module_doc,
+            hints=record.hints,
+            refactor_effort=record.refactor_effort,
+            blast_radius=record.blast_radius,
         )
 
     # ── Graph ─────────────────────────────────────────────────────────────────
 
     def _build_graph(self) -> None:
-        self.graph = {}
-        self.rev = defaultdict(list)
-
-        for fd in self.files.values():
-            resolved_set: set[str] = set()
-            for dep in fd.internal_dependencies:
-                canon = self._canonicalize(dep)
-                if canon and canon != fd.file:
-                    resolved_set.add(canon)
-            resolved = list(resolved_set)
-            self.graph[fd.file] = resolved
-            fd.internal_dependencies = resolved
-            fd.fan_out = len(resolved)
-
-        for src, tgts in self.graph.items():
-            for tgt in tgts:
-                self.rev[tgt].append(src)
-
-        for fd in self.files.values():
-            fd.fan_in = len(self.rev.get(fd.file, []))
+        self.graph, self.rev = build_graph(self.files, self._file_index)
 
     def _canonicalize(self, dep: str) -> str | None:
         if dep in self.files:
@@ -827,22 +818,11 @@ class AnalysisEngine:
     # ── Graph metrics ─────────────────────────────────────────────────────────
 
     def _enrich_graph_metrics(self) -> None:
-        pagerank = self._compute_pagerank()
-        for fd in self.files.values():
-            fd.pagerank = pagerank.get(fd.file, 0.0)
-            if fd.fan_out > 0:
-                fd.impact_radius = self._impact_radius(fd.file, depth=2)
-            else:
-                fd.impact_radius = 0
+        enrich_graph_metrics(self.files, self.graph)
 
     def _compute_v8_metrics(self) -> None:
         """Compute refactor_effort and blast_radius for every file."""
-        rev_dict = {k: list(v) for k, v in self.rev.items()}
-        for fd in self.files.values():
-            fd.refactor_effort = compute_refactor_effort(
-                fd.complexity_score, fd.fan_in, fd.pagerank
-            )
-            fd.blast_radius = compute_blast_radius_2hop(fd.file, rev_dict)
+        compute_v8_metrics(self.files, self.rev)
 
     # ── Architecture rules ────────────────────────────────────────────────────
 
@@ -990,7 +970,6 @@ class AnalysisEngine:
 
     def _is_entrypoint(self, rel: Path, src: str) -> bool:
         name = rel.name.lower()
-        parts = {p.lower() for p in rel.parts}
         dirs = {p.lower() for p in rel.parts[:-1]}
         if name in _ENTRYPOINT_NAMES:
             return True
@@ -1176,8 +1155,20 @@ class AnalysisEngine:
 
     # ── Empty fallback ────────────────────────────────────────────────────────
 
-    def _empty_meta(self, path: Path) -> dict[str, Any]:
+    def _empty_meta(self, path: Path) -> AnalysisRecord:
         rel = path.relative_to(self.root).as_posix()
         meta = dict(_EMPTY_META_TEMPLATE)
         meta["file"] = rel
-        return meta
+        return AnalysisRecord.from_dict(meta)
+
+
+
+
+
+
+
+
+
+
+
+

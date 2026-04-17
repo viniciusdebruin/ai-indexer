@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from ai_indexer.exporters.base import BaseExporter
+from ai_indexer.core.output import normalize_file_payload
 
 _SIMPLE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 _RESERVED = frozenset({"true", "false", "null"})
@@ -57,7 +58,7 @@ class ToonExporter(BaseExporter):
         parts.append(self._render_files_columnar(data.get("files") or {}))
 
         # Remaining sections via generic serialiser
-        for key in ("hotspots", "execution_flows", "modules"):
+        for key in ("hotspots", "execution_flows", "modules", "diagnostics"):
             val = data.get(key)
             if val:
                 parts.append(f"{key}:")
@@ -72,16 +73,18 @@ class ToonExporter(BaseExporter):
         lines.append("  @columns: " + " ".join(_FILE_COLUMNS))
         lines.append("  @rows:")
         for _path, fd in files.items():
-            row = self._extract_row(fd)
+            row = self._extract_row(normalize_file_payload(fd, _path))
             lines.append("    " + " ".join(self._scalar(v) for v in row))
         # Hints / warnings / capabilities appended as key-value after rows
         lines.append("  @detail:")
         for path, fd in files.items():
-            hints = fd.get("hints") or {}
-            desc  = hints.get("description", "")
-            warns = fd.get("warns") or []
-            caps  = fd.get("caps") or {}
-            if desc or warns or caps:
+            normalized = normalize_file_payload(fd, path)
+            hints = normalized.get("hints") or {}
+            desc = hints.get("description", "")
+            warns = normalized.get("warnings") or []
+            caps = normalized.get("capabilities") or {}
+            explanation = normalized.get("priority_breakdown") or {}
+            if desc or warns or caps or explanation:
                 lines.append(f"  {self._maybe_quote(path)}:")
                 if desc:
                     lines.append(f"    hint: {self._scalar(desc)}")
@@ -92,30 +95,32 @@ class ToonExporter(BaseExporter):
                         lines.append(
                             f"    {cap_key}: {' '.join(self._scalar(v) for v in cap_vals[:5])}"
                         )
+                for score_key, score_val in sorted(explanation.items()):
+                    lines.append(f"    score_{score_key}: {self._scalar(score_val)}")
         return "\n".join(lines)
 
     @staticmethod
     def _extract_row(fd: dict[str, Any]) -> list[Any]:
-        ft  = fd.get("ft") or {}
-        d   = fd.get("d") or {}
+        ft  = fd.get("file_type") or {}
+        d   = fd.get("domain") or {}
         return [
-            fd.get("f", ""),
+            fd.get("file", ""),
             ft.get("value", ""),
             ft.get("confidence", 0.0),
             d.get("value", ""),
             d.get("confidence", 0.0),
-            fd.get("sd") or "",
-            fd.get("l", "u"),
-            fd.get("c", "s"),
-            fd.get("ep", False),
-            fd.get("cl", "l"),
-            fd.get("cs", 0),
-            fd.get("ps", 0),
-            fd.get("fi", 0),
-            fd.get("fo", 0),
-            fd.get("pr", 0.0),
-            fd.get("re", 0.0),
-            fd.get("br", 0),
+            fd.get("secondary_domain") or "",
+            fd.get("layer", "unknown")[:1],
+            fd.get("criticality", "supporting")[:1],
+            fd.get("entrypoint", False),
+            fd.get("complexity_label", "low")[:1],
+            fd.get("complexity_score", 0),
+            fd.get("priority_score", 0),
+            fd.get("fan_in", 0),
+            fd.get("fan_out", 0),
+            fd.get("pagerank", 0.0),
+            fd.get("refactor_effort", 0.0),
+            fd.get("blast_radius", 0),
         ]
 
     # ── Generic serialiser (non-file sections) ───────────────────────────────

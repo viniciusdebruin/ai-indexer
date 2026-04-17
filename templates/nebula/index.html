@@ -106,8 +106,18 @@
 
     {# Hotspot table #}
     <div class="table-card">
+      <div class="toolbar">
+        <input id="hotspot-search" type="search" placeholder="Search file or domain">
+        <select id="criticality-filter">
+          <option value="">All criticalities</option>
+          <option value="critical">critical</option>
+          <option value="infra">infra</option>
+          <option value="config">config</option>
+          <option value="supporting">supporting</option>
+        </select>
+      </div>
       <h2 style="font-size:.95rem;font-weight:600;color:#0f172a;margin-bottom:12px;">Top 20 Hotspots</h2>
-      <table>
+      <table id="hotspot-table">
         <thead><tr>
           <th>File</th><th>Criticality</th><th>Priority</th>
           <th>Domain</th><th>Refactor Effort</th><th>Blast Radius</th>
@@ -116,7 +126,7 @@
           {% for h in top20 %}
           {% set crit = h.criticality %}
           {% set bc = "badge-critical" if crit=="critical" else "badge-infra" if crit=="infra" else "badge-config" if crit=="config" else "badge-default" %}
-          <tr>
+          <tr data-criticality="{{ crit | e }}">
             <td>{{ h.file | e }}</td>
             <td><span class="badge {{ bc }}">{{ crit | e }}</span></td>
             <td>{{ h.priority }}</td>
@@ -161,6 +171,10 @@
         {% endif %}
       </div>
     </div>
+    <div class="chart-card">
+      <h2>Diagnostics</h2>
+      <pre class="diag-block">{{ diagnostics | tojson(indent=2) }}</pre>
+    </div>
 
     <div id="back-bar">
       <button class="nb-btn" id="btn-to-nebula" style="background:#1a3460;border-color:#2d5a9e;">
@@ -203,6 +217,33 @@
   var bn=document.getElementById('btn-to-nebula');
   if(bd) bd.addEventListener('click',function(){switchView('dash');});
   if(bn) bn.addEventListener('click',function(){switchView('nebula');});
+  var search=document.getElementById('hotspot-search');
+  var criticality=document.getElementById('criticality-filter');
+  var table=document.getElementById('hotspot-table');
+  function applyFilters(){
+    if(!table) return;
+    var needle=(search && search.value || '').toLowerCase();
+    var crit=(criticality && criticality.value || '').toLowerCase();
+    table.querySelectorAll('tbody tr').forEach(function(row){
+      var text=row.innerText.toLowerCase();
+      var rowCrit=(row.getAttribute('data-criticality') || '').toLowerCase();
+      var visible=(!needle || text.indexOf(needle) !== -1) && (!crit || rowCrit === crit);
+      row.style.display=visible ? '' : 'none';
+    });
+  }
+  if(search) search.addEventListener('input', applyFilters);
+  if(criticality) criticality.addEventListener('change', applyFilters);
+  if(table){
+    table.querySelectorAll('tbody tr').forEach(function(row){
+      row.addEventListener('click', function(){
+        var file=row.querySelector('td');
+        if(file && window.focusNodeByFile){
+          window.focusNodeByFile(file.innerText);
+          switchView('nebula');
+        }
+      });
+    });
+  }
 })();
 </script>
 </body>

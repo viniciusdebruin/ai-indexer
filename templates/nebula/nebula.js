@@ -387,6 +387,13 @@ function flyToNode(idx) {
     .to({x:target.x,y:target.y,z:target.z},900)
     .easing(TWEEN.Easing.Cubic.InOut).start();
 }
+window.focusNodeByFile = function(filePath) {
+  const idx = fileKeys.indexOf(filePath);
+  if (idx >= 0) {
+    showInfo(idx);
+    flyToNode(idx);
+  }
+};
 
 // ── Guided tour ───────────────────────────────────────────────────────────────
 let tourActive=false, tourIdx=0, tourTimer=null;

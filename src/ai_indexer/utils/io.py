@@ -4,10 +4,9 @@ import path resolution, and gitignore filtering."""
 from __future__ import annotations
 
 import fnmatch
+import importlib
 import json
 import mmap
-import os
-import re
 from pathlib import Path
 from typing import Any
 
@@ -157,18 +156,33 @@ class ImportResolver:
 def build_import_resolution_state(
     root: Path, file_index: dict[str, str]
 ) -> tuple[dict[str, Path], set[str]]:
-    """Read tsconfig.json, package.json, and bunfig.toml to extract aliases."""
+    """Read project metadata to extract aliases and internal bare module names."""
     aliases: dict[str, Path] = {}
+    package_json: dict[str, Any] = {}
+    tomllib_mod: Any = None
+    try:
+        tomllib_mod = importlib.import_module("tomllib")
+    except ImportError:
+        try:
+            tomllib_mod = importlib.import_module("tomli")
+        except ImportError:
+            pass
 
     # tsconfig.json paths
     tsconfig_path = root / "tsconfig.json"
     if tsconfig_path.exists():
         try:
-            tsconfig = json.loads(
-                tsconfig_path.read_text(encoding="utf-8", errors="ignore")
-            ).get("compilerOptions", {})
-            base_url = tsconfig.get("baseUrl", ".")
-            for alias, targets in (tsconfig.get("paths", {}) or {}).items():
+            tsconfig_json = json.loads(tsconfig_path.read_text(encoding="utf-8", errors="ignore"))
+            compiler_options = dict(tsconfig_json.get("compilerOptions", {}) or {})
+            extends_path = tsconfig_json.get("extends")
+            if isinstance(extends_path, str):
+                parent_config = _load_extended_tsconfig(root, tsconfig_path.parent, extends_path)
+                compiler_options = {
+                    **dict(parent_config.get("compilerOptions", {}) or {}),
+                    **compiler_options,
+                }
+            base_url = compiler_options.get("baseUrl", ".")
+            for alias, targets in (compiler_options.get("paths", {}) or {}).items():
                 if targets:
                     aliases[alias.rstrip("/*")] = (
                         root / base_url / targets[0].rstrip("/*")
@@ -178,7 +192,6 @@ def build_import_resolution_state(
 
     # package.json _moduleAliases
     pkg_path = root / "package.json"
-    package_json: dict[str, Any] = {}
     if pkg_path.exists():
         try:
             package_json = json.loads(
@@ -195,18 +208,10 @@ def build_import_resolution_state(
     # bunfig.toml [bundle.alias]
     bunfig_path = root / "bunfig.toml"
     if bunfig_path.exists():
-        _tomllib = None
-        try:
-            import tomllib as _tomllib  # type: ignore[no-redef]
-        except ImportError:
-            try:
-                import tomli as _tomllib  # type: ignore[no-redef]
-            except ImportError:
-                pass
-        if _tomllib is not None:
+        if tomllib_mod is not None:
             try:
                 with open(bunfig_path, "rb") as f:
-                    bunfig = _tomllib.load(f)
+                    bunfig = tomllib_mod.load(f)
                 for _alias, _target in (bunfig.get("bundle", {}).get("alias", {}) or {}).items():
                     try:
                         aliases[_alias.rstrip("/*")] = (root / _target).resolve()
@@ -214,6 +219,32 @@ def build_import_resolution_state(
                         pass
             except Exception:
                 pass
+
+    pyproject_path = root / "pyproject.toml"
+    if pyproject_path.exists() and tomllib_mod is not None:
+        try:
+            with open(pyproject_path, "rb") as f:
+                pyproject = tomllib_mod.load(f)
+            packages = pyproject.get("tool", {}).get("setuptools", {}).get("packages", {}).get("find", {}).get("where", [])
+            if isinstance(packages, list):
+                for package_root in packages:
+                    aliases[str(package_root)] = (root / str(package_root)).resolve()
+            src_layout = root / "src"
+            if src_layout.exists():
+                aliases.setdefault("src", src_layout.resolve())
+                for child in src_layout.iterdir():
+                    if child.is_dir():
+                        aliases.setdefault(child.name, child.resolve())
+        except Exception:
+            pass
+
+    for workspace_root in _workspace_roots(root, package_json):
+        aliases.setdefault(workspace_root.name, workspace_root.resolve())
+        src_dir = workspace_root / "src"
+        if src_dir.exists():
+            for child in src_dir.iterdir():
+                if child.is_dir():
+                    aliases.setdefault(child.name, child.resolve())
 
     bare_names: set[str] = set()
     for rel in file_index.values():
@@ -232,13 +263,45 @@ def build_import_resolution_state(
     return aliases, {n for n in bare_names if n}
 
 
+def _load_extended_tsconfig(root: Path, current_dir: Path, extends_path: str) -> dict[str, Any]:
+    candidate = Path(extends_path)
+    if not candidate.suffix:
+        candidate = candidate.with_suffix(".json")
+    if not candidate.is_absolute():
+        candidate = (current_dir / candidate).resolve()
+    if not candidate.exists() or root not in [candidate, *candidate.parents]:
+        return {}
+    try:
+        loaded = json.loads(candidate.read_text(encoding="utf-8", errors="ignore"))
+        return loaded if isinstance(loaded, dict) else {}
+    except Exception:
+        return {}
+
+
+def _workspace_roots(root: Path, package_json: dict[str, Any]) -> list[Path]:
+    workspaces = package_json.get("workspaces", [])
+    if isinstance(workspaces, dict):
+        workspaces = workspaces.get("packages", [])
+    if not isinstance(workspaces, list):
+        return []
+    roots: list[Path] = []
+    for pattern in workspaces:
+        if not isinstance(pattern, str):
+            continue
+        for candidate in root.glob(pattern):
+            package_json_path = candidate / "package.json"
+            if candidate.is_dir() and package_json_path.exists():
+                roots.append(candidate)
+    return roots
+
+
 # ── Gitignore filter ──────────────────────────────────────────────────────────
 
 try:
-    import pathspec as _pathspec
+    pathspec_mod: Any = importlib.import_module("pathspec")
     _PATHSPEC_AVAILABLE = True
 except ImportError:
-    _pathspec = None  # type: ignore[assignment]
+    pathspec_mod = None
     _PATHSPEC_AVAILABLE = False
 
 
@@ -262,7 +325,7 @@ class GitignoreFilter:
                 pass
         if _PATHSPEC_AVAILABLE and raw_lines:
             try:
-                self._spec = _pathspec.PathSpec.from_lines("gitwildmatch", raw_lines)
+                self._spec = pathspec_mod.PathSpec.from_lines("gitwildmatch", raw_lines)
             except Exception:
                 pass
 

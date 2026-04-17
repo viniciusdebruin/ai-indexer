@@ -10,7 +10,7 @@ log = logging.getLogger("ai-indexer.config")
 
 _YAML_AVAILABLE = False
 try:
-    import yaml as _yaml
+    import yaml as _yaml  # type: ignore[import-untyped]
     _YAML_AVAILABLE = True
 except ImportError:
     pass
@@ -23,8 +23,6 @@ class IndexerConfig:
 
     def __init__(self, data: dict[str, Any]) -> None:
         self._d = data
-
-    # ── Accessors ────────────────────────────────────────────────────────────
 
     @property
     def exclude_dirs(self) -> set[str]:
@@ -72,40 +70,31 @@ class IndexerConfig:
 
     @property
     def type_segment_rules(self) -> list[tuple[str, str] | tuple[str, str, float]]:
-        """User-defined segment → file-type rules prepended before built-in rules."""
         return list(self._d.get("type_segment_rules", []))
 
     @property
     def type_name_rules(self) -> list[tuple[str, str] | tuple[str, str, float]]:
-        """User-defined stem-keyword → file-type rules prepended before built-in rules."""
         return list(self._d.get("type_name_rules", []))
 
     @property
     def type_suffix_rules(self) -> dict[str, tuple[str, float]]:
-        """User-defined suffix → (file-type, confidence) overrides."""
         return dict(self._d.get("type_suffix_rules", {}))
 
     @property
     def type_exact_name_rules(self) -> dict[str, tuple[str, float]]:
-        """User-defined exact filename → (file-type, confidence) overrides."""
         return dict(self._d.get("type_exact_name_rules", {}))
 
     @property
     def include_patterns(self) -> list[str]:
-        """Glob patterns that files must match to be included (empty = include all)."""
         return list(self._d.get("include_patterns", []))
 
     @property
     def security_enabled(self) -> bool:
-        """Whether to scan files for hardcoded secrets/credentials."""
         return bool(self._d.get("security", {}).get("enabled", True))
 
     @property
     def instruction_file(self) -> str:
-        """Path to a plain-text instruction file to inject into all outputs."""
         return str(self._d.get("instruction_file", ""))
-
-    # ── Git context ──────────────────────────────────────────────────────────
 
     @property
     def git_include_logs(self) -> bool:
@@ -133,20 +122,37 @@ def load_config(root: Path) -> IndexerConfig:
     config_path = root / CONFIG_FILENAME
     if not config_path.exists():
         return IndexerConfig({})
-
     if not _YAML_AVAILABLE:
         log.warning(
-            "%s found but pyyaml is not installed — using defaults. "
-            "Run: pip install pyyaml",
+            "%s found but pyyaml is not installed. Install the 'full' extra to enable YAML config support.",
             CONFIG_FILENAME,
         )
         return IndexerConfig({})
-
     try:
         with open(config_path, encoding="utf-8") as f:
             data = _yaml.safe_load(f) or {}
+        if not isinstance(data, dict):
+            log.warning("%s must contain a mapping at the top level; using defaults", config_path)
+            return IndexerConfig({})
         log.info("Loaded config from %s", config_path)
         return IndexerConfig(data)
     except Exception as exc:
-        log.warning("Failed to parse %s (%s) — using defaults", config_path, exc)
+        log.warning("Failed to parse %s (%s) - using defaults", config_path, exc)
         return IndexerConfig({})
+
+
+def validate_config(root: Path) -> tuple[bool, str]:
+    """Validate .indexer.yaml syntax without falling back to defaults."""
+    config_path = root / CONFIG_FILENAME
+    if not config_path.exists():
+        return True, "No config file found."
+    if not _YAML_AVAILABLE:
+        return False, "pyyaml is not installed."
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            data = _yaml.safe_load(f)
+        if data is not None and not isinstance(data, dict):
+            return False, f"{CONFIG_FILENAME} must contain a mapping at the top level."
+        return True, f"{CONFIG_FILENAME} is valid."
+    except Exception as exc:
+        return False, str(exc)

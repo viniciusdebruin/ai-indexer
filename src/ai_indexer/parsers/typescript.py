@@ -33,7 +33,7 @@ try:
             return Parser(lang)
         except TypeError:
             p = Parser()
-            p.set_language(lang)  # type: ignore[attr-defined]
+            p.set_language(lang)
             return p
 
     _TS_PARSER  = _make_parser(_TS_LANG)
@@ -59,10 +59,10 @@ try:
     except ImportError:
         # tree-sitter < 0.25
 
-        def _make_query(lang: Any, src: str) -> Any:  # type: ignore[misc]
+        def _make_query(lang: Any, src: str) -> Any:
             return lang.query(src)
 
-        def _run_captures(query: Any, node: Any) -> list[tuple[Any, str]]:  # type: ignore[misc]
+        def _run_captures(query: Any, node: Any) -> list[tuple[Any, str]]:
             return list(query.captures(node))
 
     _IMPORT_QUERY_SRC = """
@@ -106,8 +106,8 @@ class TypeScriptParser(BaseParser):
             self._parse_regex(path, src, resolver, result)
 
         # Dynamic imports via regex (supplements tree-sitter)
-        for m in _RE_JS_DYN_IMPORT.finditer(src):
-            mod = m.group(1)
+        for dyn_match in _RE_JS_DYN_IMPORT.finditer(src):
+            mod = dyn_match.group(1)
             resolved = resolver.resolve_import(mod, path)
             if resolved:
                 if resolved not in result.internal:
@@ -119,9 +119,9 @@ class TypeScriptParser(BaseParser):
 
         # Fallback module_doc from leading JSDoc (regex path only)
         if result.module_doc is None:
-            m = re.match(r"/\*\*(.*?)\*/", src, re.DOTALL)
-            if m:
-                for line in m.group(0).split("\n"):
+            jsdoc_match: re.Match[str] | None = re.match(r"/\*\*(.*?)\*/", src, re.DOTALL)
+            if jsdoc_match:
+                for line in jsdoc_match.group(0).split("\n"):
                     line = line.strip().lstrip("*").strip()
                     if line and not line.startswith("@") and line not in ("/**", "*/", "/"):
                         result.module_doc = line
@@ -204,7 +204,7 @@ class TypeScriptParser(BaseParser):
     def _extract_jsdoc(node: Any) -> str | None:
         prev = node.prev_sibling
         if prev and prev.type == "comment":
-            text = prev.text.decode("utf-8")
+            text: str = str(prev.text.decode("utf-8"))
             if text.startswith("/**"):
                 for line in text.split("\n"):
                     line = line.strip().lstrip("*").strip()

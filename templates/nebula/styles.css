@@ -229,6 +229,35 @@ body {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+.toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.toolbar input,
+.toolbar select {
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.78rem;
+  background: #fff;
+  color: #0f172a;
+}
+.toolbar input {
+  min-width: 220px;
+  flex: 1 1 280px;
+}
+.diag-block {
+  background: #0f172a;
+  color: #dbeafe;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 0.7rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 table { width: 100%; border-collapse: collapse; font-size: 0.72rem; min-width: 460px; }
 th {
   text-align: left; padding: 8px; border-bottom: 2px solid #e2e8f0;

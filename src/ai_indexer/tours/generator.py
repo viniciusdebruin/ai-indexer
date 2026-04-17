@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ai_indexer.core.engine import AnalysisEngine
@@ -73,7 +73,7 @@ class TourGenerator:
             if fd.file in seen:
                 continue
             seen.add(fd.file)
-            domain_str = fd.domain.get("value", "") if isinstance(fd.domain, dict) else str(fd.domain)
+            domain_str = fd.domain.value
             tour.steps.append(TourStep(
                 order=order,
                 title=f"Arquivo Crítico: {Path(fd.file).name}",
@@ -87,11 +87,10 @@ class TourGenerator:
             order += 1
 
         # Final step – architecture summary
-        domains: set[Any] = set()
+        domains: set[str] = set()
         for fd in files.values():
-            d = fd.domain.get("value") if isinstance(fd.domain, dict) else fd.domain
-            if d:
-                domains.add(d)
+            if fd.domain.value:
+                domains.add(fd.domain.value)
 
         tour.steps.append(TourStep(
             order=order,

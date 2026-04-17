@@ -1,11 +1,11 @@
-# ai_indexer/audio_tours/script_builder.py
 import re
-from typing import List
+from typing import Any
+
 
 class ScriptBuilder:
     """Transforma os dados do tour em um roteiro narrativo refinado."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Dicionário de limpeza para termos técnicos
         self.replacements = {
             r"__": " dunder ",
@@ -27,7 +27,7 @@ class ScriptBuilder:
         text = text.replace("_", " ")
         return text
 
-    def build_full_script(self, tour) -> str:
+    def build_full_script(self, tour: Any) -> str:
         """Cria o roteiro completo com pausas e introdução."""
         parts = []
         parts.append(f"Iniciando o tour guiado pelo projeto: {self._clean_text(tour.name)}.")
@@ -40,7 +40,7 @@ class ScriptBuilder:
             parts.append(f"{self._clean_text(step.explanation)}.")
             if step.file_path:
                 parts.append(f"Localizado no arquivo: {self._clean_text(str(step.file_path))}.")
-            parts.append(" . . . ") # Pausa entre etapas
+            parts.append(" . . . ")
 
         parts.append("Fim do tour. Agora você tem uma visão geral da arquitetura.")
         return "\n".join(parts)

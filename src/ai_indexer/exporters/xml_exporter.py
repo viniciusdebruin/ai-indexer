@@ -31,16 +31,26 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any
 from xml.etree import ElementTree as ET
 
 from ai_indexer.exporters.base import BaseExporter
+from ai_indexer.core.output import normalize_file_payload
 
 log = logging.getLogger("ai-indexer.xml")
 
 
-def _sub(parent: ET.Element, tag: str, text: str | None = None, **attrib: str) -> ET.Element:
-    el = ET.SubElement(parent, tag, **attrib)
+def _sub(
+    parent: ET.Element,
+    tag: str,
+    text: str | None = None,
+    attrib: Mapping[str, str] | None = None,
+    **extra: str,
+) -> ET.Element:
+    attrs: dict[str, str] = dict(attrib or {})
+    attrs.update(extra)
+    el = ET.SubElement(parent, tag, attrs)
     if text is not None:
         el.text = text
     return el
@@ -67,7 +77,7 @@ class XmlExporter(BaseExporter):
         ET.SubElement(
             root_el, "file_summary",
             total_files=str(stats.get("total_files", 0)),
-            critical=str(stats.get("critical_files", 0)),
+            critical=str(stats.get("critical_files", stats.get("critical", 0))),
             domains=str(stats.get("domains", 0)),
             entrypoints=str(stats.get("entrypoints", 0)),
         )
@@ -75,7 +85,7 @@ class XmlExporter(BaseExporter):
         # ── Hotspots ─────────────────────────────────────────────────────────
         hotspots_el = ET.SubElement(root_el, "hotspots")
         for h in data.get("hotspots", []):
-            ET.SubElement(
+            hotspot_el = ET.SubElement(
                 hotspots_el, "file",
                 path=str(h.get("file", "")),
                 priority=str(h.get("priority_score", 0)),
@@ -84,37 +94,40 @@ class XmlExporter(BaseExporter):
                 refactor_effort=f'{h.get("refactor_effort", 0):.2f}',
                 blast_radius=str(h.get("blast_radius", 0)),
             )
+            explanation = h.get("score_explanation") or {}
+            if explanation:
+                explain_el = ET.SubElement(hotspot_el, "score_explanation")
+                for key, value in sorted(explanation.items()):
+                    _sub(explain_el, "signal", None, name=str(key), value=str(value))
 
         # ── Files ─────────────────────────────────────────────────────────────
         files_el = ET.SubElement(root_el, "files")
         for path, fd in sorted(data.get("files", {}).items()):
-            domain_val = ""
-            domain_raw = fd.get("d") or fd.get("domain")
-            if isinstance(domain_raw, dict):
-                domain_val = domain_raw.get("value", "")
-            elif isinstance(domain_raw, str):
-                domain_val = domain_raw
+            normalized = normalize_file_payload(fd, path)
+            domain_val = normalized["domain"]["value"]
+            criticality = normalized["criticality"]
+            module_doc = normalized["module_doc"] or ""
+            internal = normalized["internal_dependencies"]
 
             file_el = ET.SubElement(
                 files_el, "file",
-                path=str(fd.get("f") or fd.get("file", path)),
-                criticality=str(fd.get("c") or fd.get("criticality", "supporting")),
+                path=normalized["file"],
+                criticality=criticality,
                 domain=domain_val,
-                entrypoint="true" if (fd.get("ep") or fd.get("entrypoint")) else "false",
-                priority=str(fd.get("ps") or fd.get("priority_score", 0)),
-                fan_in=str(fd.get("fi") or fd.get("fan_in", 0)),
+                entrypoint="true" if normalized["entrypoint"] else "false",
+                priority=str(normalized["priority_score"]),
+                fan_in=str(normalized["fan_in"]),
             )
 
             # Module doc
-            mdoc = fd.get("md") or fd.get("module_doc", "")
-            if mdoc:
-                _sub(file_el, "module_doc", mdoc)
+            if module_doc:
+                _sub(file_el, "module_doc", module_doc)
 
             # Functions / classes / exports
-            caps = fd.get("caps") or fd.get("capabilities", {})
-            funcs = caps.get("fn") or caps.get("functions", [])
-            classes = caps.get("cl") or caps.get("classes", [])
-            exports = caps.get("ex") or caps.get("exports", [])
+            caps = normalized["capabilities"]
+            funcs = caps.get("functions", [])
+            classes = caps.get("classes", [])
+            exports = caps.get("exports", [])
             if funcs or classes or exports:
                 caps_el = ET.SubElement(file_el, "capabilities")
                 if funcs:
@@ -125,18 +138,32 @@ class XmlExporter(BaseExporter):
                     _sub(caps_el, "exports", ", ".join(exports[:20]))
 
             # Internal dependencies
-            internal = fd.get("id") or fd.get("internal_dependencies", [])
             if internal:
                 deps_el = ET.SubElement(file_el, "dependencies")
                 for dep in internal[:20]:
                     _sub(deps_el, "dep", dep)
 
             # Warnings
-            warns = fd.get("warns") or fd.get("warnings", [])
+            warns = normalized["warnings"]
             if warns:
                 warns_el = ET.SubElement(file_el, "warnings")
                 for w in warns[:5]:
                     _sub(warns_el, "warning", w)
+            explanation = normalized["priority_breakdown"]
+            if explanation:
+                explain_el = ET.SubElement(file_el, "score_explanation")
+                for key, value in sorted(explanation.items()):
+                    _sub(explain_el, "signal", None, name=str(key), value=str(value))
+            hints = normalized["hints"]
+            if hints:
+                hints_el = ET.SubElement(file_el, "analysis_hints")
+                for key, value in sorted(hints.items()):
+                    if isinstance(value, list):
+                        bucket = ET.SubElement(hints_el, key)
+                        for item in value[:10]:
+                            _sub(bucket, "item", str(item))
+                    else:
+                        _sub(hints_el, key, str(value))
 
         # ── Git context ───────────────────────────────────────────────────────
         git_ctx = data.get("git_context")
@@ -164,6 +191,17 @@ class XmlExporter(BaseExporter):
                 freq_el = ET.SubElement(git_el, "change_frequency")
                 for fp, count in sorted(freq.items(), key=lambda x: -x[1])[:30]:
                     ET.SubElement(freq_el, "file", path=fp, changes=str(count))
+
+        diagnostics = data.get("diagnostics")
+        if diagnostics:
+            diag_el = ET.SubElement(root_el, "diagnostics")
+            for key, value in sorted(diagnostics.items()):
+                if isinstance(value, dict):
+                    section = ET.SubElement(diag_el, key)
+                    for inner_key, inner_value in sorted(value.items()):
+                        _sub(section, "item", None, name=str(inner_key), value=str(inner_value))
+                else:
+                    _sub(diag_el, key, str(value))
 
         # ── Serialise ─────────────────────────────────────────────────────────
         ET.indent(root_el, space="  ")

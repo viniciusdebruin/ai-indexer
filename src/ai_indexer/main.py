@@ -12,14 +12,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ai_indexer import __version__
 from ai_indexer.core.engine import AnalysisEngine
+from ai_indexer.core.models import HotspotRecord, ProjectAnalysis, ProjectStats
 from ai_indexer.exporters.html import HtmlExporter
 from ai_indexer.exporters.toon import ToonExporter
 from ai_indexer.exporters.xml_exporter import XmlExporter
+from ai_indexer.core.output import validate_output_payload
 from ai_indexer.mcp.server import MCPServer
-from ai_indexer.utils.config import load_config
+from ai_indexer.utils.config import load_config, validate_config
 from ai_indexer.utils.ui import AnalysisUI
+from ai_indexer.version import __version__
 
 # ── Structured JSON logging (active only in verbose/non-TTY mode) ─────────────
 logging.basicConfig(
@@ -239,6 +241,32 @@ def _build_parser() -> argparse.ArgumentParser:
             "Can also be disabled via 'security.enabled: false' in .indexer.yaml."
         ),
     )
+    analysis_group.add_argument(
+        "--profile",
+        choices=["fast", "standard", "deep", "security"],
+        default="standard",
+        help="Preset analysis profile that adjusts depth and token budgets.",
+    )
+    analysis_group.add_argument(
+        "--fail-on-warning",
+        action="store_true",
+        help="Exit with a non-zero code if any analysis warnings are detected.",
+    )
+    analysis_group.add_argument(
+        "--fail-on-secret",
+        action="store_true",
+        help="Exit with a non-zero code if secret/credential findings are detected.",
+    )
+    analysis_group.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Analyze and print the final summary without writing output files.",
+    )
+    analysis_group.add_argument(
+        "--diagnostics",
+        action="store_true",
+        help="Print a diagnostics JSON report after analysis.",
+    )
 
     # ── Integration ───────────────────────────────────────────────────────────
     integration_group = p.add_argument_group("Integrations")
@@ -275,6 +303,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Speech rate in words per minute.  Default: 160.",
     )
     audio_group.add_argument(
+        "--audio-language",
+        default="pt-BR",
+        metavar="LANG",
+        help="Preferred language/locale hint for voice selection, e.g. pt-BR or en-US.",
+    )
+    audio_group.add_argument(
+        "--audio-voice",
+        default=None,
+        metavar="VOICE",
+        help="Preferred voice name fragment for narration.",
+    )
+    audio_group.add_argument(
         "--bg-music",
         type=Path, default=None, metavar="FILE",
         help=(
@@ -296,6 +336,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Show version and exit.",
     )
     misc_group.add_argument(
+        "--validate-config",
+        action="store_true",
+        help="Validate .indexer.yaml and exit.",
+    )
+    misc_group.add_argument(
         "--help", "-h",
         action="help", default=argparse.SUPPRESS,
         help="Show this help message and exit.",
@@ -311,37 +356,48 @@ def _build_output(
     instruction: str = "",
     git_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    from ai_indexer.core.engine import VERSION
+    from ai_indexer.version import __version__ as package_version
     files = engine.files
-    out: dict[str, Any] = {
-        "version":   VERSION,
-        "project":   engine.root.name,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "stats": {
-            "total_files":   len(files),
-            "critical_files": sum(1 for f in files.values() if f.criticality == "critical"),
-            "entrypoints":   sum(1 for f in files.values() if f.entrypoint),
-            "domains":       len({f.domain.value for f in files.values()}),
-        },
-        "files": {path: fd.to_dict(compact=True) for path, fd in sorted(files.items())},
-        "dependency_graph": engine.graph,
-        "reverse_graph":    {k: list(v) for k, v in engine.rev.items()},
-        "pagerank":         {path: fd.pagerank for path, fd in files.items()},
-        "execution_flows":  [],
-        "modules":          _detect_modules(engine),
-        "hotspots": sorted(
-            [{"file": f.file, "priority_score": f.priority_score, "pagerank": f.pagerank,
-              "fan_in": f.fan_in, "refactor_effort": round(f.refactor_effort, 4),
-              "blast_radius": f.blast_radius}
-             for f in files.values()],
-            key=lambda x: x["priority_score"], reverse=True,
-        )[:15],
-    }
-    if instruction:
-        out["instruction"] = instruction
-    if git_context:
-        out["git_context"] = git_context
-    return out
+    hotspots = sorted(
+        (
+            HotspotRecord(
+                file=f.file,
+                priority_score=f.priority_score,
+                pagerank=f.pagerank,
+                fan_in=f.fan_in,
+                refactor_effort=f.refactor_effort,
+                blast_radius=f.blast_radius,
+                domain=f.domain.value,
+                criticality=f.criticality,
+                score_explanation=f.priority_breakdown,
+            )
+            for f in files.values()
+        ),
+        key=lambda item: item.priority_score,
+        reverse=True,
+    )[:15]
+    analysis = ProjectAnalysis(
+        version=package_version,
+        project=engine.root.name,
+        generated_at=datetime.now(timezone.utc).isoformat(),
+        stats=ProjectStats(
+            total_files=len(files),
+            critical_files=sum(1 for f in files.values() if f.criticality == "critical"),
+            entrypoints=sum(1 for f in files.values() if f.entrypoint),
+            domains=len({f.domain.value for f in files.values()}),
+        ),
+        files=files,
+        dependency_graph=engine.graph,
+        reverse_graph={k: list(v) for k, v in engine.rev.items()},
+        pagerank={path: fd.pagerank for path, fd in files.items()},
+        execution_flows=[],
+        modules=_detect_modules(engine),
+        hotspots=hotspots,
+        instruction=instruction,
+        git_context=git_context,
+        diagnostics=_build_diagnostics(engine, git_context),
+    )
+    return analysis.to_dict()
 
 
 def _detect_modules(engine: AnalysisEngine) -> dict[str, list[str]]:
@@ -366,30 +422,35 @@ def _write_outputs(
 
     if fmt in ("toon", "all"):
         path = override_path or (out_dir / "estrutura_projeto.toon")
+        validate_output_payload(output_data, "toon")
         ToonExporter().export(output_data, path)
         log.info("TOON written: %s", path)
         written.append(("toon", path))
 
     if fmt in ("json", "all"):
         path = override_path or (out_dir / "estrutura_projeto.json")
+        validate_output_payload(output_data, "json")
         path.write_text(json.dumps(output_data, separators=(",",":"), ensure_ascii=False), encoding="utf-8")
         log.info("JSON written: %s", path)
         written.append(("json", path))
 
     if fmt in ("html", "all"):
         path = override_path or (out_dir / "estrutura_projeto.html")
+        validate_output_payload(output_data, "html")
         HtmlExporter().export(output_data, path)
         log.info("HTML written: %s", path)
         written.append(("html", path))
 
     if fmt in ("md", "all"):
         path = override_path or (out_dir / "estrutura_projeto.md")
+        validate_output_payload(output_data, "json")
         _write_md(engine, output_data, path)
         log.info("Markdown written: %s", path)
         written.append(("md", path))
 
     if fmt in ("xml", "all"):
         path = override_path or (out_dir / "estrutura_projeto.xml")
+        validate_output_payload(output_data, "xml")
         XmlExporter().export(output_data, path)
         written.append(("xml", path))
 
@@ -432,6 +493,71 @@ def _write_md(engine: AnalysisEngine, data: dict[str, Any], path: Path) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def _apply_profile(config: Any, profile: str) -> Any:
+    data = dict(getattr(config, "_d", {}))
+    if profile == "fast":
+        data["max_depth"] = min(int(data.get("max_depth", 8)), 4)
+        data["chunk_max_tokens"] = min(int(data.get("chunk_max_tokens", 800)), 400)
+        data["max_workers"] = min(int(data.get("max_workers", 0) or 0) or 4, 8)
+    elif profile == "deep":
+        data["max_depth"] = max(int(data.get("max_depth", 8)), 12)
+        data["chunk_max_tokens"] = max(int(data.get("chunk_max_tokens", 800)), 1200)
+        data["max_workers"] = int(data.get("max_workers", 0) or 0)
+    elif profile == "security":
+        data.setdefault("security", {})
+        data["security"]["enabled"] = True
+        data["max_depth"] = int(data.get("max_depth", 8))
+    return type(config)(data)
+
+
+def _build_diagnostics(
+    engine: AnalysisEngine,
+    git_context: dict[str, Any] | None,
+) -> dict[str, Any]:
+    security_enabled = engine.config.security_enabled
+    secrets = sum(
+        1 for fd in engine.files.values()
+        for w in fd.warnings
+        if "secret" in w.lower() or "credential" in w.lower() or "hardcoded" in w.lower()
+    )
+    return {
+        "analysis_mode": "full",
+        "optional_dependencies": _optional_dependency_status(),
+        "git_context_enabled": bool(git_context),
+        "security_scan_enabled": security_enabled,
+        "secret_findings": secrets,
+        "warning_count": sum(len(fd.warnings) for fd in engine.files.values()),
+    }
+
+
+def _optional_dependency_status() -> dict[str, bool]:
+    checks = {
+        "pyyaml": "yaml",
+        "jinja2": "jinja2",
+        "pathspec": "pathspec",
+        "tiktoken": "tiktoken",
+        "pyttsx3": "pyttsx3",
+        "pydub": "pydub",
+    }
+    status: dict[str, bool] = {}
+    for label, module_name in checks.items():
+        try:
+            __import__(module_name)
+            status[label] = True
+        except ImportError:
+            status[label] = False
+    return status
+
+
+def _missing_dependency_help(feature: str) -> str:
+    feature_map = {
+        "audio": "Install the 'full' extra plus audio dependencies: pip install ai-indexer[full] pyttsx3 pydub",
+        "html": "Install the 'full' extra to enable Jinja2 templates: pip install ai-indexer[full]",
+        "config": "Install the 'full' extra to enable YAML config parsing: pip install ai-indexer[full]",
+    }
+    return feature_map.get(feature, "Install ai-indexer[full] for optional integrations.")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -454,7 +580,14 @@ def main() -> None:
         ui.error(f"Not a directory: {root}")
         sys.exit(1)
 
+    if args.validate_config:
+        ok, msg = validate_config(root)
+        print(msg, file=sys.stderr if not ok else sys.stdout)
+        sys.exit(0 if ok else 1)
+
     config = load_config(root)
+    if args.profile != "standard":
+        config = _apply_profile(config, args.profile)
     out_dir = (root / config.output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -500,7 +633,9 @@ def main() -> None:
 
     output_data = _build_output(engine, instruction=instruction, git_context=git_ctx)
     override    = Path(args.output) if args.output else None
-    written     = _write_outputs(engine, output_data, args.format, override, out_dir)
+    written = [] if args.summary_only else _write_outputs(engine, output_data, args.format, override, out_dir)
+    if args.diagnostics:
+        print(json.dumps(output_data.get("diagnostics", {}), ensure_ascii=False, indent=2))
 
     # ── Summary ───────────────────────────────────────────────────────────────
     n_security = sum(
@@ -509,6 +644,14 @@ def main() -> None:
         if "secret" in w.lower() or "credential" in w.lower() or "hardcoded" in w.lower()
     )
     ui.show_summary(output_data["stats"], n_security, written)
+
+    n_warnings = sum(len(fd.warnings) for fd in engine.files.values())
+    if args.fail_on_warning and n_warnings:
+        ui.error(f"Failing because {n_warnings} warning(s) were detected.")
+        sys.exit(2)
+    if args.fail_on_secret and n_security:
+        ui.error(f"Failing because {n_security} secret finding(s) were detected.")
+        sys.exit(2)
 
     # 🎙️ Audio Tour Integration (100% Offline)
     if args.audio:
@@ -526,7 +669,7 @@ def main() -> None:
             script_text = builder.build_full_script(tour)
 
             log.info("Synthesizing audio (offline)...")
-            narrator = LocalNarrator(rate=args.audio_rate)
+            narrator = LocalNarrator(rate=args.audio_rate, language=args.audio_language, voice_name=args.audio_voice)
             temp_wav = out_dir / "tour_temp.wav"
             narrator.synthesize(script_text, temp_wav)
 
@@ -535,12 +678,12 @@ def main() -> None:
             
             log.info("Audio tour generated successfully: %s", final_mp3)
         except ImportError:
-            log.error("Audio dependencies not found. Install with: pip install pyttsx3 pydub")
+            log.error("Audio dependencies not found. %s", _missing_dependency_help("audio"))
         except Exception as e:
             log.error("Failed to generate audio tour: %s", e)
 
     if args.mcp:
-        server = MCPServer(engine.files, engine.graph, dict(engine.rev))
+        server = MCPServer(engine.files, engine.graph, dict(engine.rev), git_context=git_ctx)
         server.serve_stdio()
 
 

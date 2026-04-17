@@ -1,4 +1,4 @@
-"""AI Context Indexer v0.0.5 – Production-Ready for 2026 LLM Ecosystems."""
+"""AI Context Indexer package."""
 
-__version__ = "0.0.5"
+from ai_indexer.version import __version__
 __all__ = ["__version__"]
