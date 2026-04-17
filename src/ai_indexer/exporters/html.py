@@ -66,6 +66,8 @@ class HtmlExporter(BaseExporter):
                 "warnings": normalized["warnings"][:3],
                 "refactor_effort": normalized["refactor_effort"],
                 "blast_radius": normalized["blast_radius"],
+                "score_explanation": normalized["priority_breakdown"],
+                "classification": normalized["hints"].get("classification", {}),
             }
 
         edge_list: list[list[str]] = [
@@ -282,21 +284,6 @@ class HtmlExporter(BaseExporter):
             for d, c in _leg
         )
 
-        # CDN scripts for Three.js + extras + TWEEN
-        cdn = (
-            '<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/build/three.min.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/EffectComposer.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/RenderPass.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/UnrealBloomPass.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/ShaderPass.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/shaders/LuminosityHighPassShader.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/shaders/CopyShader.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/renderers/CSS2DRenderer.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/@tweenjs/tween.js@18.6.4/dist/tween.umd.js"></script>'
-            '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>'
-        )
-
         switcher = """<script>
 function switchView(v){
   var nv=document.getElementById('nebula-view');
@@ -359,7 +346,6 @@ if(nb) nb.addEventListener('click',function(){switchView('nebula');});
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:,">
 <title>Code Nebula v8 &middot; {safe(proj)}</title>
-{cdn}
 </head>
 <body>
 <script>{data_block}</script>

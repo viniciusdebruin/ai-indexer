@@ -472,13 +472,21 @@ def _write_md(engine: AnalysisEngine, data: dict[str, Any], path: Path) -> None:
         f"- **Entrypoints:** {sum(1 for f in files.values() if f.entrypoint)}",
         "",
         "## Top Hotspots",
-        "| File | Priority | Refactor Effort | Blast Radius | Domain |",
-        "|------|----------|-----------------|--------------|--------|",
+        "| File | Priority | Refactor Effort | Blast Radius | Domain | Score Signals |",
+        "|------|----------|-----------------|--------------|--------|---------------|",
     ]
     for fd in sorted(files.values(), key=lambda x: x.priority_score, reverse=True)[:10]:
+        top_signals = ", ".join(
+            f"{name}:{value:.1f}"
+            for name, value in sorted(
+                fd.priority_breakdown.items(),
+                key=lambda item: abs(item[1]),
+                reverse=True,
+            )[:3]
+        )
         lines.append(
             f"| `{fd.file}` | {fd.priority_score} | {fd.refactor_effort:.1f} | "
-            f"{fd.blast_radius} | {fd.domain.value} |"
+            f"{fd.blast_radius} | {fd.domain.value} | {top_signals or '-'} |"
         )
     lines += ["", "## Architectural Warnings"]
     warns = [(fd.file, fd.warnings) for fd in files.values() if fd.warnings]
@@ -487,6 +495,12 @@ def _write_md(engine: AnalysisEngine, data: dict[str, Any], path: Path) -> None:
             lines.append(f"### `{file}`")
             for w in wl[:3]:
                 lines.append(f"- {w}")
+            file_meta = files[file]
+            classification = file_meta.hints.get("classification", {})
+            domain_evidence = classification.get("domain_evidence", {})
+            if domain_evidence:
+                evidence = ", ".join(f"{name}:{value:.1f}" for name, value in list(domain_evidence.items())[:3])
+                lines.append(f"- Domain evidence: {evidence}")
     else:
         lines.append("No warnings detected.")
     lines.append(f"\n---\n_AI Context Indexer v{ver}_{ts}_")

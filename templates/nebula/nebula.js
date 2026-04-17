@@ -9,6 +9,26 @@
  *  - TWEEN.js fly-to-node animations on click
  */
 
+if (typeof window.THREE === "undefined" || typeof window.TWEEN === "undefined") {
+  (function fallbackToDashboard() {
+    const nebulaView = document.getElementById("nebula-view");
+    const nebulaControls = document.getElementById("nebula-controls");
+    const zoomControls = document.getElementById("zoom-controls");
+    const title = document.getElementById("project-title");
+    const dashboard = document.getElementById("dash-view");
+    if (nebulaView) nebulaView.style.display = "none";
+    if (nebulaControls) nebulaControls.style.display = "none";
+    if (zoomControls) zoomControls.style.display = "none";
+    if (title) title.style.display = "none";
+    if (dashboard) dashboard.style.display = "block";
+    const toNebula = document.getElementById("btn-to-nebula");
+    if (toNebula) {
+      toNebula.setAttribute("disabled", "true");
+      toNebula.title = "3D engine libraries are not available in this build.";
+    }
+  })();
+} else {
+
 // ── Scene setup ───────────────────────────────────────────────────────────────
 const canvas    = document.getElementById("nebula-canvas");
 const isMobile  = window.innerWidth < 640 || ('ontouchstart' in window);
@@ -321,6 +341,30 @@ function showInfo(idx) {
   content.appendChild(bar);
 
   content.appendChild(makeRow("blast radius", String(fd.blast_radius||0)+" files"));
+  const scoreExplanation = fd.score_explanation || {};
+  const scoreKeys = Object.keys(scoreExplanation);
+  if (scoreKeys.length) {
+    const scoreBlock = document.createElement("div");
+    scoreBlock.className = "ni-hint";
+    scoreBlock.textContent = "Score signals: " + scoreKeys
+      .sort((a, b) => Math.abs(scoreExplanation[b]) - Math.abs(scoreExplanation[a]))
+      .slice(0, 4)
+      .map(k => k + "=" + Number(scoreExplanation[k]).toFixed(1))
+      .join(", ");
+    content.appendChild(scoreBlock);
+  }
+  const classification = fd.classification || {};
+  const domainEvidence = classification.domain_evidence || {};
+  const domainKeys = Object.keys(domainEvidence);
+  if (domainKeys.length) {
+    const evidenceBlock = document.createElement("div");
+    evidenceBlock.className = "ni-hint";
+    evidenceBlock.textContent = "Domain evidence: " + domainKeys
+      .slice(0, 3)
+      .map(k => k + "=" + Number(domainEvidence[k]).toFixed(1))
+      .join(", ");
+    content.appendChild(evidenceBlock);
+  }
 
   if(fd.role_hint){
     const hint=document.createElement("div"); hint.className="ni-hint";
@@ -475,3 +519,4 @@ let clock=0;
   composer.render();
   labelRenderer.render(scene,camera);
 })();
+}
